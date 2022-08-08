@@ -1,0 +1,26 @@
+ARG GO_VERSION=1.18
+
+FROM golang:${GO_VERSION}-alpine AS builder
+
+RUN mkdir -p /app/build
+RUN mkdir -p /app/fund-consumer
+
+WORKDIR /app
+
+COPY fund-consumer/* fund-consumer/
+
+WORKDIR /app/fund-consumer
+RUN go mod download
+RUN go build -o /app/build/ main.go
+
+FROM alpine:latest
+
+RUN mkdir -p /app/build
+
+WORKDIR /app
+
+COPY --from=builder /app/build/* build/
+
+WORKDIR /app/build
+
+ENTRYPOINT ["./main"]

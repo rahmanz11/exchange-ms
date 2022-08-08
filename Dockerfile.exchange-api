@@ -1,0 +1,28 @@
+ARG GO_VERSION=1.18
+
+FROM golang:${GO_VERSION}-alpine AS builder
+
+RUN mkdir -p /app/build
+RUN mkdir -p /app/exchange-api
+
+WORKDIR /app
+
+COPY exchange-api/* exchange-api/
+
+WORKDIR /app/exchange-api
+RUN go mod download
+RUN go build -o /app/build/ main.go
+
+FROM alpine:latest
+
+RUN mkdir -p /app/build
+
+WORKDIR /app
+
+COPY --from=builder /app/build/* build/
+
+WORKDIR /app/build
+
+EXPOSE 3641
+
+ENTRYPOINT ["./main"]
