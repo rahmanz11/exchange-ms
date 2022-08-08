@@ -44,8 +44,10 @@ var db_addr string
 // main function will be executed when this file is run
 func main() {
 
-	kafka_addr = getEnv("KAFKA_ADDR", "localhost:29092")
-	db_addr = getEnv("DB_ADDR", "localhost:26257")
+	kafka_addr = getEnv("KAFKA_ADDR", "kafka:29092")
+	db_addr = getEnv("DB_ADDR", "node_1:26257")
+
+	fmt.Printf("~~~~~~~~~~~kafka_addr %s db_addr %s~~~~~~~~~~~~~~~~ \n", kafka_addr, db_addr)
 
 	// initialize kafka connection and reader
 	r := kafka.NewReader(kafka.ReaderConfig{
@@ -103,28 +105,6 @@ func main() {
 
 				if err != nil {
 					fmt.Printf("Error while inserting data into transactions table. Reason: %s", err.Error())
-				} else {
-					/*
-						// produce to transactions
-						var transaction_init TransactionInit
-						transaction_init.TransactionId = exchange_order.TransactionId
-						transaction_init.CompletedAt = completed_at
-
-						conn, err := kafka.DialLeader(context.Background(), "tcp", kafka_addr, "transactions", 0)
-						if err != nil {
-							fmt.Printf("Failed to dial leader: %s", err)
-						}
-						// convert ExchangeOrder object to json string before publish message
-						msg, _ := json.Marshal(transaction_init)
-						if msg != nil {
-							_, err = conn.WriteMessages(
-								kafka.Message{Value: msg},
-							)
-							if err != nil {
-								fmt.Printf("Failed to produce transaction message. Reason: %s", err)
-							}
-						}
-					*/
 				}
 			}
 		}
@@ -160,29 +140,29 @@ func update_transaction_failed(transaction_id string, msg string) {
 	db.Close()
 }
 
-func validate(acc_num string, amt float64, db *sql.DB) string {
+func validate(sub_account_id string, amt float64, db *sql.DB) string {
 	var msg string
 	var balance float64
 	var status string
 
-	sqlStatement := `SELECT balance, status FROM sub_accounts WHERE account_number = $1`
-	row := db.QueryRow(sqlStatement, acc_num)
+	sqlStatement := `SELECT balance, status FROM sub_accounts WHERE sub_account_id = $1`
+	row := db.QueryRow(sqlStatement, sub_account_id)
 	switch err := row.Scan(&balance, &status); err {
 	case sql.ErrNoRows:
-		msg = "SUB ACCOUNT INFORMATION IS NOT AVAILABLE IN DATABASE"
+		msg = fmt.Sprintf("INVALID SUB ACCOUNT ID: %s", sub_account_id)
 	case nil:
 		// record found with given account number
 		// validate account status
 		if status == "inactive" {
-			msg = "ACCOUNT INACTIVE"
+			msg = fmt.Sprintf("INACTIVE SUB ACCOUNT ID: %s", sub_account_id)
 		} else {
 			// validate from sub account balance is greater than given amt
 			if balance < amt {
-				msg = "INSUFFICIENT BALANCE"
+				msg = fmt.Sprintf("INSUFFICIENT BALANCE IN SUB ACCOUNT ID: %s", sub_account_id)
 			}
 		}
 	default:
-		msg = fmt.Sprintf("Fund-Consumer: Error occurred while querying sub account database. Reason: %s", err)
+		msg = fmt.Sprintf("DATABASE ERROR: %s", err.Error())
 	}
 
 	return msg

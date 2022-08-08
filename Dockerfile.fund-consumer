@@ -3,13 +3,13 @@ ARG GO_VERSION=1.18
 FROM golang:${GO_VERSION}-alpine AS builder
 
 RUN mkdir -p /app/build
-RUN mkdir -p /app/transaction-consumer
+RUN mkdir -p /app/fund-consumer
 
 WORKDIR /app
 
-COPY transaction-consumer/* transaction-consumer/
+COPY fund-consumer/* fund-consumer/
 
-WORKDIR /app/transaction-consumer
+WORKDIR /app/fund-consumer
 RUN go mod download
 RUN go build -o /app/build/ main.go
 

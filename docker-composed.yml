@@ -16,6 +16,7 @@ services:
       - 29092:29092
     expose:
       - 9092
+    restart: unless-stopped
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -72,24 +73,21 @@ services:
     restart: unless-stopped
     depends_on: 
       - kafka # This service depends on kafka. Start that first.
-      - init-kafka # This service depends on init-kafka. Start that first.
       - node_1 # This service depends on node_1. Start that first.
       - db-init # This service depends on db-init. Start that first.
     environment: # Pass environment variables to the service
-      KAFKA_ADDR: kafka:9092
+      KAFKA_ADDR: kafka:29092
       DB_ADDR: node_1:26257
 
-  fund_consumer:
-    # Configuration for building the docker image for the exchange order service
+  fund-consumer:
+    # Configuration for building the docker image for the fund consumer
     build:
       context: . # Use an image built from the specified dockerfile in the current directory.
       dockerfile: Dockerfile.fund-consumer
     restart: unless-stopped
     depends_on: 
-      - kafka # This service depends on kafka. Start that first.
-      - init-kafka # This service depends on init-kafka. Start that first.
       - node_1 # This service depends on node_1. Start that first.
       - db-init # This service depends on db-init. Start that first.
     environment: # Pass environment variables to the service
-      KAFKA_ADDR: kafka:9092
+      KAFKA_ADDR: kafka:29092
       DB_ADDR: node_1:26257

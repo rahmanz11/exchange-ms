@@ -32,6 +32,15 @@ type Order struct {
 	Re    string  `json:"re"`
 }
 
+type SubAccount struct {
+	AccountId      string  `json:"sub_account_id"`
+	AccountNumber  string  `json:"account_number"`
+	Balance        float64 `json:"balance"`
+	LinkedAccuonts string  `json:"linked_accounts"`
+	Status         string  `json:"status"`
+	Credential     string  `json:"credential"`
+}
+
 type ExchangeOrder struct {
 	Blank         string    `json:"blank"`
 	From          string    `json:"from"`
@@ -55,14 +64,15 @@ var db_addr string
 // main function will be executed when this file is run
 func main() {
 
-	kafka_addr = getEnv("KAFKA_ADDR", "localhost:29092")
-	db_addr = getEnv("DB_ADDR", "localhost:26257")
+	kafka_addr = getEnv("KAFKA_ADDR", "kafka:29092")
+	db_addr = getEnv("DB_ADDR", "node_1:26257")
 
 	// gin framework for REST API
 	r := gin.Default()
 
 	// API endpoints
 	r.POST("/exchange_api/submit_order", PostOrder)
+	r.POST("/sub_account/new", NewSubAccount)
 
 	// API will run at mentioned address
 	r.Run(":3641")
@@ -178,29 +188,71 @@ func PostOrder(c *gin.Context) {
 
 }
 
-func validate(type_of_acc string, acc_num string, amt float64, db *sql.DB) string {
+// handler function for Sub Account Post
+func NewSubAccount(c *gin.Context) {
+
+	var sub_acc SubAccount
+	// call BindJSON to bind the received JSON to sub account
+	if err := c.BindJSON(&sub_acc); err != nil {
+		c.IndentedJSON(http.StatusBadRequest, err)
+		return
+	}
+
+	msg, _ := json.MarshalIndent(sub_acc, "", "	")
+	fmt.Printf("%s", string(msg))
+
+	uuid := uuid.New()
+	sub_acc.AccountId = uuid.String()
+
+	// database connection string
+	sub_acc_db_conn := fmt.Sprintf(`postgresql://postgres:$@%s/sub_account_db?sslmode=disable`, db_addr)
+	sub_acc_db, connerr := sql.Open("postgres", sub_acc_db_conn)
+	if connerr != nil {
+		msg := fmt.Sprintf("DATABASE ERROR: %s", connerr.Error())
+		// return bad gateway
+		c.IndentedJSON(http.StatusServiceUnavailable, msg)
+		return
+	}
+	defer sub_acc_db.Close()
+
+	// persist to sub_accounts table
+	sql := `INSERT INTO sub_accounts (sub_account_id, account_number, balance, linked_accounts, status, credentials) 
+	VALUES ($1, $2, $3, $4, $5, $6)`
+	_, err := sub_acc_db.Exec(sql, sub_acc.AccountId, sub_acc.AccountNumber, sub_acc.Balance, sub_acc.LinkedAccuonts,
+		sub_acc.Status, sub_acc.Credential)
+	if err != nil {
+		msg := fmt.Sprintf("DATABASE ERROR: %s", err.Error())
+		// return bad gateway
+		c.IndentedJSON(http.StatusServiceUnavailable, msg)
+		return
+	}
+
+	c.IndentedJSON(http.StatusBadGateway, sub_acc.AccountId)
+}
+
+func validate(type_of_acc string, sub_account_id string, amt float64, db *sql.DB) string {
 	var msg string
 	var balance float64
 	var status string
 
-	sqlStatement := `SELECT balance, status FROM sub_accounts WHERE account_number = $1`
-	row := db.QueryRow(sqlStatement, acc_num)
+	sqlStatement := `SELECT balance, status FROM sub_accounts WHERE sub_account_id = $1`
+	row := db.QueryRow(sqlStatement, sub_account_id)
 	switch err := row.Scan(&balance, &status); err {
 	case sql.ErrNoRows:
-		msg = fmt.Sprintf("Sub account information invalid. Type: %s, Number: %s", type_of_acc, acc_num)
+		msg = fmt.Sprintf("INVALID SUB ACCOUNT ID: %s", sub_account_id)
 	case nil:
 		// record found with given account number
 		// validate account status
 		if status == "inactive" {
-			msg = fmt.Sprintf("Sub account status is inactive. Type: %s, Number: %s", type_of_acc, acc_num)
+			msg = fmt.Sprintf("INACTIVE SUB ACCOUNT ID: %s", sub_account_id)
 		} else {
 			// validate from sub account balance is greater than given amt
 			if type_of_acc == "From" && balance < amt {
-				msg = fmt.Sprintf("Insufficient amount in sub account. Type: %s, Number: %s", type_of_acc, acc_num)
+				msg = fmt.Sprintf("INSUFFICIENT FUND IN SUB ACCOUNT ID: %s", sub_account_id)
 			}
 		}
 	default:
-		msg = fmt.Sprintf("Error occurred while querying sub account database. Reason: %s", err)
+		msg = fmt.Sprintf("DATABASE ERROR: %s", err.Error())
 	}
 
 	return msg
