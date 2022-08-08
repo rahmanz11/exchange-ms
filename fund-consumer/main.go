@@ -81,6 +81,9 @@ func main() {
 				continue
 			}
 
+			val, _ := json.MarshalIndent(exchange_order, "", "	")
+			fmt.Printf("%s", string(val))
+
 			msg := validate(exchange_order.From, exchange_order.Amt, sub_acc_db)
 			if msg != "" {
 				update_transaction_failed(exchange_order.TransactionId, msg)
@@ -152,13 +155,13 @@ func adjust_sub_account_balance(from string, fund string, amt float64) {
 	defer sub_acc_db.Close()
 
 	if connerr != nil {
-		fmt.Printf("Fund-Consumer: Error while opening transactions db con %s\n", connerr)
+		fmt.Printf("Fund-Consumer: Error while opening sub account db con %s\n", connerr)
 	} else {
-		sql_statement := `UPDATE sub_accounts SET amt = amt - $1 WHERE sub_account_id = $2;`
+		sql_statement := `UPDATE sub_accounts SET balance = balance - $1 WHERE sub_account_id = $2;`
 		res, err := sub_acc_db.Exec(sql_statement, amt, from)
 
 		if err != nil {
-			fmt.Printf("Fund-Consumer: Error occurred while updating amt in from sub account. Reason: %s", err.Error())
+			fmt.Printf("Fund-Consumer: Error occurred while updating balance in from sub account. Reason: %s", err.Error())
 		} else {
 			count, err := res.RowsAffected()
 			if err != nil {
@@ -166,10 +169,10 @@ func adjust_sub_account_balance(from string, fund string, amt float64) {
 			} else {
 				if count > 0 {
 					fmt.Printf("Fund-Consumer: From account balance adjusted, id: %s", from)
-					sql_statement := `UPDATE sub_accounts SET amt = amt + $1 WHERE sub_account_id = $2;`
+					sql_statement := `UPDATE sub_accounts SET balance = balance + $1 WHERE sub_account_id = $2;`
 					res, err := sub_acc_db.Exec(sql_statement, amt, fund)
 					if err != nil {
-						fmt.Printf("Fund-Consumer: Error occurred while updating amt in fund sub account. Reason: %s", err.Error())
+						fmt.Printf("Fund-Consumer: Error occurred while updating balance in fund sub account. Reason: %s", err.Error())
 					} else {
 						count, err := res.RowsAffected()
 						if err != nil {
