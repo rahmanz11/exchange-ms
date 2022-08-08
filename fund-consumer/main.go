@@ -104,25 +104,27 @@ func main() {
 				if err != nil {
 					fmt.Printf("Error while inserting data into transactions table. Reason: %s", err.Error())
 				} else {
-					// produce to transactions
-					var transaction_init TransactionInit
-					transaction_init.TransactionId = exchange_order.TransactionId
-					transaction_init.CompletedAt = completed_at
+					/*
+						// produce to transactions
+						var transaction_init TransactionInit
+						transaction_init.TransactionId = exchange_order.TransactionId
+						transaction_init.CompletedAt = completed_at
 
-					conn, err := kafka.DialLeader(context.Background(), "tcp", kafka_addr, "transactions", 0)
-					if err != nil {
-						fmt.Printf("Failed to dial leader: %s", err)
-					}
-					// convert ExchangeOrder object to json string before publish message
-					msg, _ := json.Marshal(transaction_init)
-					if msg != nil {
-						_, err = conn.WriteMessages(
-							kafka.Message{Value: msg},
-						)
+						conn, err := kafka.DialLeader(context.Background(), "tcp", kafka_addr, "transactions", 0)
 						if err != nil {
-							fmt.Printf("Failed to produce transaction message. Reason: %s", err)
+							fmt.Printf("Failed to dial leader: %s", err)
 						}
-					}
+						// convert ExchangeOrder object to json string before publish message
+						msg, _ := json.Marshal(transaction_init)
+						if msg != nil {
+							_, err = conn.WriteMessages(
+								kafka.Message{Value: msg},
+							)
+							if err != nil {
+								fmt.Printf("Failed to produce transaction message. Reason: %s", err)
+							}
+						}
+					*/
 				}
 			}
 		}
