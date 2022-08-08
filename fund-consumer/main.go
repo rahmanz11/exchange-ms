@@ -47,8 +47,6 @@ func main() {
 	kafka_addr = getEnv("KAFKA_ADDR", "kafka:29092")
 	db_addr = getEnv("DB_ADDR", "node_1:26257")
 
-	fmt.Printf("~~~~~~~~~~~kafka_addr %s db_addr %s~~~~~~~~~~~~~~~~ \n", kafka_addr, db_addr)
-
 	// initialize kafka connection and reader
 	r := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:   []string{kafka_addr},
@@ -105,6 +103,9 @@ func main() {
 
 				if err != nil {
 					fmt.Printf("Error while inserting data into transactions table. Reason: %s", err.Error())
+				} else {
+					// update sub account balance
+					adjust_sub_account_balance(exchange_order.From, exchange_order.Fund, exchange_order.Amt)
 				}
 			}
 		}
@@ -138,6 +139,55 @@ func update_transaction_failed(transaction_id string, msg string) {
 		}
 	}
 	db.Close()
+}
+
+func adjust_sub_account_balance(from string, fund string, amt float64) {
+	sub_acc_db_conn := fmt.Sprintf(`postgresql://postgres:$@%s/sub_account_db?sslmode=disable`, db_addr)
+
+	sub_acc_db, connerr := sql.Open("postgres", sub_acc_db_conn)
+	if connerr != nil {
+		fmt.Printf("Error while sub account db connection %s", connerr)
+		return
+	}
+	defer sub_acc_db.Close()
+
+	if connerr != nil {
+		fmt.Printf("Fund-Consumer: Error while opening transactions db con %s\n", connerr)
+	} else {
+		sql_statement := `UPDATE sub_accounts SET amt = amt - $1 WHERE sub_account_id = $2;`
+		res, err := sub_acc_db.Exec(sql_statement, amt, from)
+
+		if err != nil {
+			fmt.Printf("Fund-Consumer: Error occurred while updating amt in from sub account. Reason: %s", err.Error())
+		} else {
+			count, err := res.RowsAffected()
+			if err != nil {
+				fmt.Printf("Fund-Consumer: Error occurred while adjusting from account %s balance. Reason: %s", from, err.Error())
+			} else {
+				if count > 0 {
+					fmt.Printf("Fund-Consumer: From account balance adjusted, id: %s", from)
+					sql_statement := `UPDATE sub_accounts SET amt = amt + $1 WHERE sub_account_id = $2;`
+					res, err := sub_acc_db.Exec(sql_statement, amt, fund)
+					if err != nil {
+						fmt.Printf("Fund-Consumer: Error occurred while updating amt in fund sub account. Reason: %s", err.Error())
+					} else {
+						count, err := res.RowsAffected()
+						if err != nil {
+							fmt.Printf("Fund-Consumer: Error occurred while adjusting fund account %s balance. Reason: %s", from, err.Error())
+						} else {
+							if count > 0 {
+								fmt.Printf("Fund-Consumer: Fund account balance adjusted, id: %s", from)
+							} else {
+								fmt.Printf("Fund-Consumer: Fund account %s balance adjusted failed to update", from)
+							}
+						}
+					}
+				} else {
+					fmt.Printf("Fund-Consumer: From account %s balance adjusted failed to update", from)
+				}
+			}
+		}
+	}
 }
 
 func validate(sub_account_id string, amt float64, db *sql.DB) string {
