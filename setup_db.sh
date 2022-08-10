@@ -26,8 +26,8 @@ $SQL -d exchange_orders_db -e "CREATE TABLE IF NOT EXISTS exchange_orders
     fund        varchar(100),
     amt         double precision,
     re        varchar(200),
-    received_at    date,
-    validated_at   date
+    received_at    timestamp,
+    validated_at   timestamp
 );"
 
 $SQL -d transactions_db -e "CREATE TABLE IF NOT EXISTS transactions
@@ -37,10 +37,10 @@ $SQL -d transactions_db -e "CREATE TABLE IF NOT EXISTS transactions
     fund        varchar(100),
     amt         double precision,
     re        varchar(200),
-    received_at    date,
-    validated_at   date,
-    submitted_at   date,
-    completed_at   date,
+    received_at    timestamp,
+    validated_at   timestamp,
+    submitted_at   timestamp,
+    completed_at   timestamp,
     status         varchar(10),
     system_notes   varchar(200)
 );"

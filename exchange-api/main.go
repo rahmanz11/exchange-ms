@@ -25,11 +25,10 @@ import (
 )
 
 type Order struct {
-	Blank string  `json:"blank"`
-	From  string  `json:"from"`
-	Fund  string  `json:"fund"`
-	Amt   float64 `json:"amt"`
-	Re    string  `json:"re"`
+	From string  `json:"from"`
+	Fund string  `json:"fund"`
+	Amt  float64 `json:"amt"`
+	Re   string  `json:"re"`
 }
 
 type SubAccount struct {
@@ -42,7 +41,6 @@ type SubAccount struct {
 }
 
 type ExchangeOrder struct {
-	Blank         string    `json:"blank"`
 	From          string    `json:"from"`
 	Fund          string    `json:"fund"`
 	Amt           float64   `json:"amt"`
@@ -87,6 +85,11 @@ func PostOrder(c *gin.Context) {
 	// call BindJSON to bind the received JSON to order
 	if err := c.BindJSON(&order); err != nil {
 		c.IndentedJSON(http.StatusBadRequest, err)
+		return
+	}
+
+	if order.Amt <= 0 {
+		c.IndentedJSON(http.StatusBadRequest, fmt.Sprintf("INVALID AMOUNT: %v", order.Amt))
 		return
 	}
 
@@ -159,7 +162,6 @@ func PostOrder(c *gin.Context) {
 
 			if conn != nil {
 				var exchange_order ExchangeOrder
-				exchange_order.Blank = order.Blank
 				exchange_order.Amt = order.Amt
 				exchange_order.Fund = order.Fund
 				exchange_order.From = order.From
@@ -215,10 +217,11 @@ func NewSubAccount(c *gin.Context) {
 	}
 	defer sub_acc_db.Close()
 
+	default_balance := 0
 	// persist to sub_accounts table
 	sql := `INSERT INTO sub_accounts (sub_account_id, account_number, balance, linked_accounts, status, credentials) 
 	VALUES ($1, $2, $3, $4, $5, $6)`
-	_, err := sub_acc_db.Exec(sql, sub_acc.AccountId, sub_acc.AccountNumber, sub_acc.Balance, sub_acc.LinkedAccuonts,
+	_, err := sub_acc_db.Exec(sql, sub_acc.AccountId, sub_acc.AccountNumber, default_balance, sub_acc.LinkedAccuonts,
 		sub_acc.Status, sub_acc.Credential)
 	if err != nil {
 		msg := fmt.Sprintf("DATABASE ERROR: %s", err.Error())
@@ -227,7 +230,7 @@ func NewSubAccount(c *gin.Context) {
 		return
 	}
 
-	c.IndentedJSON(http.StatusBadGateway, sub_acc.AccountId)
+	c.IndentedJSON(http.StatusBadGateway, fmt.Sprintf("SUB ACCOUNT ID: %s", sub_acc.AccountId))
 }
 
 func validate(type_of_acc string, sub_account_id string, amt float64, db *sql.DB) string {

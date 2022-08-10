@@ -54,7 +54,8 @@ func main() {
 		Topic:     "exchange_orders",
 		Partition: 0,
 		MinBytes:  10e3, // 10KB
-		MaxBytes:  10e6, // 10MB
+		MaxBytes:  10e6, // 10MB,
+		MaxWait:   1 * time.Second,
 	})
 
 	if r != nil {
